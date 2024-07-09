@@ -163,6 +163,7 @@ variables_to_exclude = [
 
 # Initialize the Dash app
 app = Dash(__name__)
+server = app.server
 
 app.layout = html.Div([
     html.H1("LSOA Dashboard", style={'textAlign': 'center', 'padding': '10px'}),
