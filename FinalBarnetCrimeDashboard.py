@@ -640,5 +640,5 @@ def update_correlation_scatter_plot(selected_variable, selected_ward):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, port=8060)  # Change port to 8060 or any other available port
+    app.run_server(debug=False)  # Change port to 8060 or any other available port
 
