@@ -349,10 +349,12 @@ def update_crime_map(n_clicks, date_input, selected_category):
     
             map_barnet.get_root().html.add_child(folium.Element(legend_html))
     
-            crime_map_file_path = 'Barnet_Crime_Hotspots_Custom.html'
-            map_barnet.save(crime_map_file_path)
+            # Update this part to save the map to a temporary HTML file and read it
+            import tempfile
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+            map_barnet.save(temp_file.name)
     
-            with open(crime_map_file_path, 'r') as f:
+            with open(temp_file.name, 'r') as f:
                 html_map = f.read()
     
             return html_map, dropdown_options
