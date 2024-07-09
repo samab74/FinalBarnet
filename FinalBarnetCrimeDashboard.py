@@ -64,7 +64,7 @@ try:
         print("All LSOAs successfully assigned to wards.")
 except Exception as e:
     print(f"Error processing GeoDataFrames: {e}")
-    
+
 # Load crime dataset from URL
 try:
     crime_data = pd.read_csv('https://raw.githubusercontent.com/samab74/Barnet-Dashboard/main/barnet_crimes.csv')
@@ -163,7 +163,6 @@ variables_to_exclude = [
 
 # Initialize the Dash app
 app = Dash(__name__)
-server = app.server
 
 app.layout = html.Div([
     html.H1("LSOA Dashboard", style={'textAlign': 'center', 'padding': '10px'}),
@@ -290,8 +289,8 @@ def update_crime_map(n_clicks, date_input, selected_category):
             map_barnet = folium.Map(location=[center_lat, center_lon], zoom_start=12)
     
             heat_data = [[row['latitude'], row['longitude']] for idx, row in filtered_data_by_category.iterrows()]
-            heatmap_layer = HeatMap(heat_data, name='Crime Heatmap').add_to(map_barnet)
-            marker_cluster = MarkerCluster(name='Crime Markers').add_to(map_barnet)
+            HeatMap(heat_data, name='Crime Heatmap').add_to(map_barnet)
+            MarkerCluster(name='Crime Markers').add_to(map_barnet)
     
             def get_marker_color(crime_category):
                 category_colors = {
@@ -316,7 +315,7 @@ def update_crime_map(n_clicks, date_input, selected_category):
                     location=[row['latitude'], row['longitude']],
                     popup=f'Category: {row["category"]}',
                     icon=folium.Icon(color=get_marker_color(row['category']))
-                ).add_to(marker_cluster)
+                ).add_to(map_barnet)
     
             # Updated Legend
             legend_html = '''
@@ -349,12 +348,10 @@ def update_crime_map(n_clicks, date_input, selected_category):
     
             map_barnet.get_root().html.add_child(folium.Element(legend_html))
     
-            # Update this part to save the map to a temporary HTML file and read it
-            import tempfile
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
-            map_barnet.save(temp_file.name)
+            crime_map_file_path = 'Barnet_Crime_Hotspots_Custom.html'
+            map_barnet.save(crime_map_file_path)
     
-            with open(temp_file.name, 'r') as f:
+            with open(crime_map_file_path, 'r') as f:
                 html_map = f.read()
     
             return html_map, dropdown_options
@@ -640,7 +637,7 @@ def update_correlation_scatter_plot(selected_variable, selected_ward):
     
     return fig
 
-
 if __name__ == '__main__':
-    app.run_server(debug=False)  # Change port to 8060 or any other available port
+    app.run_server(debug=False)
+
 
