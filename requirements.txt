@@ -1,9 +1,10 @@
 dash
 Flask
-pandas
-geopandas
 folium
+geopandas
+gunicorn
 numpy
+pandas
 plotly
 requests
-gunicorn
+branca
