@@ -292,12 +292,15 @@ def serve_static(path):
 )
 def update_crime_map(n_clicks, date_input, selected_category):
     if n_clicks > 0 and date_input:
+        # Change 'All Crime' to 'all-crime' for the API
+        api_category = 'all-crime' if selected_category == 'All Crime' else selected_category.lower().replace(' ', '-')
+        
         crime_data = fetch_crime_data(date_input)
         
-        if selected_category == 'All Crime':
+        if api_category == 'all-crime':
             filtered_data_by_category = crime_data
         else:
-            filtered_data_by_category = crime_data[crime_data['category'] == selected_category]
+            filtered_data_by_category = crime_data[crime_data['category'] == api_category]
 
         if not filtered_data_by_category.empty:
             center_lat, center_lon = filtered_data_by_category['latitude'].mean(), filtered_data_by_category['longitude'].mean()
@@ -371,6 +374,7 @@ def update_crime_map(n_clicks, date_input, selected_category):
     
             return download_link, download_text
     return "", "Download Crime Heatmap"
+
 
 @app.callback(
     Output('bar-chart', 'figure'),
