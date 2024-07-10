@@ -8,10 +8,12 @@ import json
 import pandas as pd
 import ast
 import geopandas as gpd
+import folium
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from folium.plugins import HeatMap, MarkerCluster
 from dash import Dash, html, dcc
 from dash.dependencies import Input, Output, State
 import requests
@@ -162,6 +164,7 @@ variables_to_exclude = [
 # Initialize the Dash app
 app = Dash(__name__)
 server = app.server
+app.config.suppress_callback_exceptions = True
 
 app.layout = html.Div([
     html.H1("LSOA Dashboard", style={'textAlign': 'center', 'padding': '10px'}),
@@ -219,7 +222,8 @@ app.layout = html.Div([
                     value='All Crime',  # Set default value to 'All Crime'
                     clearable=False
                 ),
-                dcc.Graph(id='crime-map'),  # Updated to use dcc.Graph
+                html.Br(),
+                html.A("Download Crime Heatmap", id="download-link", href="", target="_blank", style={'margin-top': '20px'}),
                 html.Div("Enter a date in YYYY-MM format and select a crime category to update the heatmap.", style={'margin-top': '20px', 'color': 'grey'})
             ], style={'padding': '10px', 'border': '1px solid #ccc', 'border-radius': '5px', 'margin-bottom': '20px'}),
         ]),
@@ -265,8 +269,24 @@ def fetch_crime_data(date):
             return df.dropna(subset=['latitude', 'longitude'])
     return pd.DataFrame()
 
+import os
+from flask import send_from_directory
+
+# Ensure 'static' directory exists
+STATIC_DIR = os.path.join(os.getcwd(), 'static')
+os.makedirs(STATIC_DIR, exist_ok=True)
+
+# Create a Flask server instance
+server = app.server
+
+# Define a route to serve files from the 'static' directory
+@server.route('/static/<path:path>')
+def serve_static(path):
+    return send_from_directory(STATIC_DIR, path)
+
 @app.callback(
-    Output('crime-map', 'figure'),
+    Output('download-link', 'href'),
+    Output('download-link', 'children'),
     [Input('submit-date-button', 'n_clicks')],
     [State('date-input', 'value'), State('crime-category-dropdown', 'value')]
 )
@@ -274,29 +294,83 @@ def update_crime_map(n_clicks, date_input, selected_category):
     if n_clicks > 0 and date_input:
         crime_data = fetch_crime_data(date_input)
         
-        crime_categories = ['All Crime'] + crime_data['category'].unique().tolist()
-        dropdown_options = [{'label': category, 'value': category} for category in crime_categories]
-
         if selected_category == 'All Crime':
             filtered_data_by_category = crime_data
         else:
             filtered_data_by_category = crime_data[crime_data['category'] == selected_category]
 
         if not filtered_data_by_category.empty:
-            fig = px.density_mapbox(
-                filtered_data_by_category,
-                lat='latitude',
-                lon='longitude',
-                z='category',
-                radius=10,
-                center=dict(lat=filtered_data_by_category['latitude'].mean(), lon=filtered_data_by_category['longitude'].mean()),
-                zoom=10,
-                mapbox_style="stamen-terrain"
-            )
-            return fig
-        else:
-            return px.density_mapbox()  # Return an empty figure if no data
-    return px.density_mapbox()  # Return an empty figure if no date is selected
+            center_lat, center_lon = filtered_data_by_category['latitude'].mean(), filtered_data_by_category['longitude'].mean()
+            map_barnet = folium.Map(location=[center_lat, center_lon], zoom_start=12)
+    
+            heat_data = [[row['latitude'], row['longitude']] for idx, row in filtered_data_by_category.iterrows()]
+            heatmap_layer = HeatMap(heat_data, name='Crime Heatmap').add_to(map_barnet)
+            marker_cluster = MarkerCluster(name='Crime Markers').add_to(map_barnet)
+    
+            def get_marker_color(crime_category):
+                category_colors = {
+                    'anti-social-behaviour': 'blue',
+                    'burglary': 'purple',
+                    'criminal-damage-arson': 'orange',
+                    'drugs': 'darkred',
+                    'other-theft': 'green',
+                    'possession-of-weapons': 'cadetblue',
+                    'public-order': 'lightred',
+                    'robbery': 'darkpurple',
+                    'shoplifting': 'lightblue',
+                    'theft-from-the-person': 'darkgreen',
+                    'vehicle-crime': 'black',
+                    'violent-crime': 'red',
+                    'other-crime': 'gray'
+                }
+                return category_colors.get(crime_category, 'black')
+    
+            for idx, row in filtered_data_by_category.iterrows():
+                folium.Marker(
+                    location=[row['latitude'], row['longitude']],
+                    popup=f'Category: {row["category"]}',
+                    icon=folium.Icon(color=get_marker_color(row['category']))
+                ).add_to(marker_cluster)
+    
+            # Updated Legend
+            legend_html = '''
+                <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 250px; height: auto; 
+                border:2px solid grey; z-index:9999; font-size:14px;
+                background-color:white;
+                padding: 10px;
+                border-radius: 5px;
+                box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+                ">
+                <h4 style="margin-top: 5px; text-align: center;">Crime Category Legend</h4>
+                <ul style="list-style-type:none; padding-left: 0;">
+                    <li><span style="background-color: blue; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Anti-Social Behaviour</li>
+                    <li><span style="background-color: purple; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Burglary</li>
+                    <li><span style="background-color: orange; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Criminal Damage & Arson</li>
+                    <li><span style="background-color: darkred; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Drugs</li>
+                    <li><span style="background-color: green; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Other Theft</li>
+                    <li><span style="background-color: cadetblue; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Possession of Weapons</li>
+                    <li><span style="background-color: lightred; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Public Order</li>
+                    <li><span style="background-color: darkpurple; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Robbery</li>
+                    <li><span style="background-color: lightblue; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Shoplifting</li>
+                    <li><span style="background-color: darkgreen; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Theft from the Person</li>
+                    <li><span style="background-color: black; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Vehicle Crime</li>
+                    <li><span style="background-color: red; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Violent Crime</li>
+                    <li><span style="background-color: gray; display: inline-block; width: 12px; height: 12px; margin-right: 5px;"></span> Other Crime</li>
+                </ul>
+                </div>
+                '''
+    
+            map_barnet.get_root().html.add_child(folium.Element(legend_html))
+    
+            crime_map_file_path = os.path.join(STATIC_DIR, f'crime_heatmap_{date_input}_{selected_category}.html')
+            map_barnet.save(crime_map_file_path)
+    
+            download_link = f'/static/crime_heatmap_{date_input}_{selected_category}.html'
+            download_text = f'Download Crime Heatmap for {date_input} ({selected_category})'
+    
+            return download_link, download_text
+    return "", "Download Crime Heatmap"
 
 @app.callback(
     Output('bar-chart', 'figure'),
