@@ -18,6 +18,8 @@ from dash import Dash, html, dcc
 from dash.dependencies import Input, Output, State
 import requests
 from datetime import datetime
+import os
+from flask import send_from_directory
 
 # Load the GeoJSON files from URLs
 try:
@@ -84,7 +86,7 @@ def extract_lat_lon(location_str):
 try:
     crime_data[['latitude', 'longitude']] = crime_data['location'].apply(extract_lat_lon)
     filtered_crime_data = crime_data.dropna(subset=['latitude', 'longitude'])
-    crime_categories = ['All Crime'] + filtered_crime_data['category'].unique().tolist()
+    crime_categories = ['all-crime'] + filtered_crime_data['category'].unique().tolist()
 except Exception as e:
     print(f"Error processing crime data: {e}")
 
@@ -219,7 +221,7 @@ app.layout = html.Div([
                 dcc.Dropdown(
                     id='crime-category-dropdown',
                     options=[{'label': category, 'value': category} for category in crime_categories],
-                    value='All Crime',  # Set default value to 'All Crime'
+                    value='all-crime',  # Set default value to 'all-crime'
                     clearable=False
                 ),
                 html.Br(),
@@ -292,15 +294,13 @@ def serve_static(path):
 )
 def update_crime_map(n_clicks, date_input, selected_category):
     if n_clicks > 0 and date_input:
-        # Change 'All Crime' to 'all-crime' for the API
-        api_category = 'all-crime' if selected_category == 'All Crime' else selected_category.lower().replace(' ', '-')
-        
+        # Use 'all-crime' for the API
         crime_data = fetch_crime_data(date_input)
         
-        if api_category == 'all-crime':
+        if selected_category == 'all-crime':
             filtered_data_by_category = crime_data
         else:
-            filtered_data_by_category = crime_data[crime_data['category'] == api_category]
+            filtered_data_by_category = crime_data[crime_data['category'] == selected_category]
 
         if not filtered_data_by_category.empty:
             center_lat, center_lon = filtered_data_by_category['latitude'].mean(), filtered_data_by_category['longitude'].mean()
@@ -374,7 +374,6 @@ def update_crime_map(n_clicks, date_input, selected_category):
     
             return download_link, download_text
     return "", "Download Crime Heatmap"
-
 
 @app.callback(
     Output('bar-chart', 'figure'),
